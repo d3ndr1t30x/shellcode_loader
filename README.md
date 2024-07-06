@@ -41,4 +41,4 @@ Run the Script:
 
     Execute the Python script on the target machine:
 
-'''python shellcode_loader.py'''
+"""python shellcode_loader.py"""
